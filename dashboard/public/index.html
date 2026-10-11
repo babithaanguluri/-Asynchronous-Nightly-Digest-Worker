@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nightly Digest Worker - Production Orchestration & DLQ Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="background-glow glow-1"></div>
+  <div class="background-glow glow-2"></div>
+  <div class="background-glow glow-3"></div>
+
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" stroke-width="2" fill="none">
+            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title">Nightly Digest Worker</div>
+          <div class="brand-subtitle">Asynchronous Background Queue & Dead Letter Queue (DLQ) Engine</div>
+        </div>
+      </div>
+
+      <div class="system-status-pills">
+        <div class="status-pill healthy" id="pill-api" title="API Status">
+          <span class="dot"></span>
+          <span>API :3000</span>
+        </div>
+        <div class="status-pill healthy" id="pill-db" title="PostgreSQL Status">
+          <span class="dot"></span>
+          <span>PostgreSQL :5432</span>
+        </div>
+        <div class="status-pill healthy" id="pill-redis" title="Redis Status">
+          <span class="dot"></span>
+          <span>Redis :6379</span>
+        </div>
+        <div class="status-pill healthy" id="pill-worker" title="BullMQ Background Worker">
+          <span class="dot"></span>
+          <span>BullMQ Worker (5x)</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Top Telemetry Stats Cards -->
+    <section class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Jobs Processed</div>
+        <div class="stat-value" id="stat-total">--</div>
+        <div class="stat-sub">Persisted in PostgreSQL</div>
+      </div>
+      <div class="stat-card stat-success">
+        <div class="stat-label">Successful Digests</div>
+        <div class="stat-value text-emerald" id="stat-success">--</div>
+        <div class="stat-sub">State: pending → started → success</div>
+      </div>
+      <div class="stat-card stat-dlq">
+        <div class="stat-label">Dead Letter Queue (DLQ)</div>
+        <div class="stat-value text-rose" id="stat-dlq">--</div>
+        <div class="stat-sub">State: started → failed → dead_letter</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">API Response SLA</div>
+        <div class="stat-value text-cyan" id="stat-sla">&lt; 250ms</div>
+        <div class="stat-sub">HTTP 202 Non-Blocking Enqueue</div>
+      </div>
+    </section>
+
+    <!-- Main Two-Column Workflow Section -->
+    <main class="dashboard-body">
+      <!-- Left Column: Controls & Active Job Inspector -->
+      <section class="panel control-panel">
+        <div class="panel-header">
+          <h2>Execution Control Center</h2>
+          <span class="badge">Live Actions</span>
+        </div>
+
+        <p class="panel-desc">
+          Trigger background nightly digest workloads to observe non-blocking API ingestion, real-time BullMQ processing, and failure isolation.
+        </p>
+
+        <div class="action-buttons">
+          <button id="btn-trigger-success" class="btn btn-primary">
+            <span class="btn-icon">⚡</span>
+            <div class="btn-text">
+              <span class="btn-title">Trigger Success Digest</span>
+              <span class="btn-caption">simulate_failure: false (Standard Flow)</span>
+            </div>
+          </button>
+
+          <button id="btn-trigger-failure" class="btn btn-danger">
+            <span class="btn-icon">⚠️</span>
+            <div class="btn-text">
+              <span class="btn-title">Trigger Injected Failure (DLQ)</span>
+              <span class="btn-caption">simulate_failure: true (Fatal Routing)</span>
+            </div>
+          </button>
+
+          <button id="btn-trigger-burst" class="btn btn-accent">
+            <span class="btn-icon">🚀</span>
+            <div class="btn-text">
+              <span class="btn-title">Trigger Burst Test (10 Jobs)</span>
+              <span class="btn-caption">Concurrent stress ingestion &lt; 1.5s</span>
+            </div>
+          </button>
+
+          <button id="btn-run-tests" class="btn btn-verify">
+            <span class="btn-icon">🧪</span>
+            <div class="btn-text">
+              <span class="btn-title">Run Automated Test Suite</span>
+              <span class="btn-caption">Execute verify.ts (42/42 Tests)</span>
+            </div>
+          </button>
+        </div>
+
+        <!-- Active Job Real-Time Tracker -->
+        <div class="active-tracker-card" id="active-tracker-box">
+          <div class="tracker-header">
+            <h3>Active Job Monitor</h3>
+            <span class="job-state-tag" id="active-state-tag">IDLE</span>
+          </div>
+
+          <div class="job-id-row">
+            <span class="label">Job UUID:</span>
+            <span class="mono-id" id="active-job-id">None selected</span>
+          </div>
+
+          <!-- State Machine Nodes Visualizer -->
+          <div class="state-machine-container">
+            <div class="sm-node" id="sm-pending">
+              <div class="sm-circle">1</div>
+              <div class="sm-title">Pending</div>
+              <div class="sm-desc">Enqueued</div>
+            </div>
+            <div class="sm-line" id="line-1"></div>
+
+            <div class="sm-node" id="sm-started">
+              <div class="sm-circle">2</div>
+              <div class="sm-title">Started</div>
+              <div class="sm-desc">Processing</div>
+            </div>
+            <div class="sm-line" id="line-2"></div>
+
+            <!-- Branch: Success or Failure -->
+            <div class="sm-branch">
+              <div class="sm-node branch-success" id="sm-success">
+                <div class="sm-circle">3a</div>
+                <div class="sm-title">Success</div>
+                <div class="sm-desc">Complete</div>
+              </div>
+              <div class="sm-node branch-failure" id="sm-failed">
+                <div class="sm-circle">3b</div>
+                <div class="sm-title">Failed</div>
+                <div class="sm-desc">Injected err</div>
+              </div>
+            </div>
+            <div class="sm-line" id="line-3"></div>
+
+            <div class="sm-node branch-dlq" id="sm-dead_letter">
+              <div class="sm-circle">4</div>
+              <div class="sm-title">Dead Letter</div>
+              <div class="sm-desc">DLQ Queue</div>
+            </div>
+          </div>
+
+          <!-- Live Step Logs -->
+          <div class="job-logs-section">
+            <div class="logs-title">Immutable State Audit Log:</div>
+            <div class="logs-timeline" id="active-logs-timeline">
+              <div class="log-placeholder">Click a trigger button above to initiate and monitor a job in real-time.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Verification Results Terminal & Live Jobs Table -->
+      <section class="panel right-panel">
+        <!-- Verification Output Modal / Box -->
+        <div class="verification-box" id="verification-panel">
+          <div class="panel-header">
+            <h2>Automated Verification Terminal</h2>
+            <span class="badge badge-verify" id="verify-status-badge">Ready</span>
+          </div>
+          <div class="terminal-container">
+            <div class="terminal-bar">
+              <span class="terminal-dot red"></span>
+              <span class="terminal-dot yellow"></span>
+              <span class="terminal-dot green"></span>
+              <span class="terminal-title">npx ts-node src/tests/verify.ts</span>
+            </div>
+            <pre class="terminal-output" id="terminal-content">Click "Run Automated Test Suite" to execute all 42 tests across schema validation, non-blocking response SLA, success state machine, failure DLQ routing, and concurrency bursts.</pre>
+          </div>
+        </div>
+
+        <!-- Recent Jobs History -->
+        <div class="jobs-table-card">
+          <div class="panel-header">
+            <h2>Recent Enqueued Jobs History</h2>
+            <button id="btn-refresh-history" class="btn-sm">↻ Refresh</button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="jobs-table">
+              <thead>
+                <tr>
+                  <th>Job ID</th>
+                  <th>Type</th>
+                  <th>Current State</th>
+                  <th>Created At</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="jobs-table-body">
+                <tr><td colspan="5" class="text-center">Loading job records...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Architecture & Contract Spec Banner -->
+    <footer class="app-footer">
+      <div class="footer-col">
+        <h4>Architecture Spec</h4>
+        <p>Native Cron / API Trigger &rarr; BullMQ Redis Queue &rarr; Background Worker (5 concurrency) &rarr; Immutable Activity Log &amp; DLQ</p>
+      </div>
+      <div class="footer-col">
+        <h4>State Sequences</h4>
+        <p><strong>Success:</strong> <code>pending &rarr; started &rarr; success</code> | <strong>Failure:</strong> <code>pending &rarr; started &rarr; failed &rarr; dead_letter</code></p>
+      </div>
+      <div class="footer-col">
+        <h4>Relational Persistence</h4>
+        <p>PostgreSQL schema with Foreign Key CASCADE: <code>job_activity_logs(job_id) &rarr; jobs(id)</code></p>
+      </div>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

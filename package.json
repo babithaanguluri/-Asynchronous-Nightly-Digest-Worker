@@ -1,0 +1,49 @@
+{
+  "name": "asynchronous-nightly-digest-worker",
+  "version": "1.0.0",
+  "description": "Asynchronous Nightly Digest Worker with Activity Logging and DLQ Routing",
+  "main": "dist/api/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start:api": "node dist/api/server.js",
+    "start:worker": "node dist/worker/index.js",
+    "start:scheduler": "node dist/scheduler/run.js",
+    "dev:api": "ts-node src/api/server.ts",
+    "dev:worker": "ts-node src/worker/index.ts",
+    "dev:scheduler": "ts-node src/scheduler/run.ts",
+    "migrate": "node dist/db/migrate.js",
+    "test": "node --test dist/tests/*.test.js"
+  },
+  "dependencies": {
+    "bullmq": "^5.41.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "ioredis": "^5.5.0",
+    "node-cron": "^3.0.3",
+    "pg": "^8.13.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.10.2",
+    "@types/node-cron": "^3.0.11",
+    "@types/pg": "^8.11.11",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "keywords": [
+    "background-worker",
+    "nightly-digest",
+    "bullmq",
+    "redis",
+    "postgres",
+    "dead-letter-queue",
+    "node-cron"
+  ],
+  "author": "",
+  "license": "ISC"
+}
