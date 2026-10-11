@@ -4,13 +4,6 @@ A production-ready scheduled background worker system that orchestrates a nightl
 
 ---
 
-## 🎬 Live Demo & Visual Walkthrough
-
-![Nightly Digest Worker Demo](demo.webp)
-
-<details>
-<summary>📸 View Execution Stages & State Transitions (Click to Expand)</summary>
-
 | Dashboard Overview | Success State Machine |
 |---|---|
 | ![Dashboard Overview](demo-assets/dashboard_loaded_1791717535822.png) | ![Success Flow](demo-assets/success_flow_observed_1791717565405.png) |
